@@ -1,0 +1,62 @@
+%% TP3 - Ejercicio 5(a)
+clc; clear; close all
+rng(7)
+
+% Parámetros
+en   = 1e-9;             % VSD [V/sqrt(Hz)]
+Sv   = en^2;             % PSD one-sided objetivo [V^2/Hz]
+B    = 50e6;             % ancho de banda [Hz]
+fs   = 2*B;              % fs = 100 MHz
+N    = 2^20;             % muestras para buena PSD
+
+% Varianza necesaria para que pwelch (one-sided) dé Sv plano
+sigma2 = Sv * fs / 2;         % [V^2]
+sigma  = sqrt(sigma2);        % [V]
+
+% Generar WGN real (blanco en [0, fs/2] por construcción)
+x = sigma * randn(N,1);
+x = x - mean(x);              % media ~ 0
+
+% PSD (one-sided). Área = varianza
+nfft = 65536; win = hamming(nfft); olap = nfft/2;
+[PSD, f] = pwelch(x, win, olap, nfft, fs, 'onesided');   % V^2/Hz
+var_est = trapz(f, PSD);                                  % ≈ sigma2
+
+% Mostrar valores
+fprintf('VSD (en)           = %.3e V/sqrt(Hz)\n', en);
+fprintf('PSD objetivo (Sv)  = %.3e V^2/Hz\n', Sv);
+fprintf('fs                 = %.1f MHz\n', fs/1e6);
+fprintf('sigma^2 teórica    = %.3e V^2\n', sigma2);
+fprintf('sigma teórica      = %.3e V\n', sigma);
+fprintf('Varianza estimada  = %.3e V^2\n', var_est);
+
+% Gráfico
+%--------------------------------------------------------------------------
+figure
+plot(f/1e6, PSD, 'LineWidth', 1.5); hold on; grid on
+yline(Sv,'--r','LineWidth',1.6,'Label','Sv = en^2');
+xline(B/1e6,'--k','B = 50 MHz');
+xlabel('Frecuencia (MHz)'), ylabel('PSD (V^2/Hz)')
+title('PSD one-sided (pwelch) — VSD = 1 nV/√Hz, fs=100 MHz')
+legend('PSD estimada','Nivel teórico','Location','best')
+set(gcf,'Color','w'), xlim([0 fs/2/1e6]);
+%--------------------------------------------------------------------------
+% Nueva frecuencia de muestreo
+fs = 200e6;                % Hz
+
+% Longitud (a gusto)
+N = 2^20;
+
+% Varianza por muestra necesaria para conservar Sv
+sigma2 = Sv * fs / 2;      % V^2
+sigma  = sqrt(sigma2);     % V
+
+% Ruido blanco real con la varianza correcta
+x = sigma * randn(N,1);
+x = x - mean(x);           % media ~ 0
+
+% Chequeo rápido en tiempo (sin PSD)
+fprintf('fs = %.0f MHz\n', fs/1e6);
+fprintf('en = %.3g V/sqrt(Hz), Sv = %.3g V^2/Hz\n', en, Sv);
+fprintf('sigma^2 teórica = %.3e V^2,  sigma teórica = %.3e V\n', sigma2, sigma);
+fprintf('var(x) estimada = %.3e V^2\n', var(x));
