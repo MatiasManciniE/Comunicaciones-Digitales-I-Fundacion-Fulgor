@@ -1,0 +1,128 @@
+% =========================================================================
+% Ejercicio 6 — PAM2/BPSK en AWGN: (a) Histogramas, (b) SNR, (c) BER, (d) Análisis
+% =========================================================================
+clear; close all; clc; rng(1)
+
+%% Parámetros base
+Ns        = 2e5;      % muestras/símbolos para (a) y (b)
+sigma2_N  = 0.1;      % varianza del ruido para el caso base
+sigma_N   = sqrt(sigma2_N);
+fz        = 14;
+
+%% =============================== (a) Histogramas ==========================
+X = 2*(rand(Ns,1) > 0.5) - 1;            % PAM2: {+1,-1} equiprobable
+N = sigma_N * randn(Ns,1);               % AWGN N(0,sigma^2)
+Y = X + N;
+
+fprintf('--- (a) Histogramas con sigma_N^2 = %.3f ---\n', sigma2_N);
+fprintf('E[X]=%.3f, Var[X]=%.3f | E[N]=%.3f, Var[N]=%.3f | E[Y]=%.3f, Var[Y]=%.3f\n', ...
+        mean(X), var(X,1), mean(N), var(N,1), mean(Y), var(Y,1));
+
+% PDFs teóricas
+xx = linspace(-4,4,2000).';
+pdfY_teo = 0.5*gauss_pdf(xx,+1,sigma_N) + 0.5*gauss_pdf(xx,-1,sigma_N);
+
+figure('Name','(a) Histogramas X, N, Y','Color','w','Position',[50 50 1200 420])
+
+% X (PMF)
+subplot(1,3,1)
+histogram(X, 'BinEdges',[-1.5 -0.5 0.5 1.5], ...
+             'FaceColor',[0.2 0.5 1], 'EdgeColor','k')
+xticks([-1 0 1]); xlim([-1.5 1.5]); grid on
+xlabel('x','Interpreter','latex','FontSize',fz)
+ylabel('Repeticiones','Interpreter','latex','FontSize',fz)
+title('Histograma de $X$ (PAM2)','Interpreter','latex','FontSize',fz)
+
+% N (gaussiano)
+subplot(1,3,2)
+histogram(N, 'Normalization','pdf', 'NumBins',100, 'FaceAlpha',0.6); hold on; grid on
+plot(xx, gauss_pdf(xx,0,sigma_N), 'r','LineWidth',1.8)
+xlabel('n','Interpreter','latex','FontSize',fz)
+ylabel('PDF','Interpreter','latex','FontSize',fz)
+title('Histograma de $N$ + PDF teórica','Interpreter','latex','FontSize',fz)
+legend({'Sim','$\mathcal{N}(0,\sigma_N^2)$'},'Interpreter','latex','Location','best')
+
+% Y (bimodal)
+subplot(1,3,3)
+histogram(Y, 'Normalization','pdf', 'NumBins',120, 'FaceAlpha',0.6); hold on; grid on
+plot(xx, pdfY_teo, 'r','LineWidth',1.8)
+xlabel('y','Interpreter','latex','FontSize',fz)
+ylabel('PDF','Interpreter','latex','FontSize',fz)
+title('Histograma de $Y=X+N$ + mezcla teórica','Interpreter','latex','FontSize',fz)
+legend({'Sim','0.5$\mathcal{N}(1,\sigma^2)$+0.5$\mathcal{N}(-1,\sigma^2)$'}, ...
+       'Interpreter','latex','Location','best')
+
+%% =============================== (b) SNR teórico y sim ====================
+SNR_teo_dB = 10*log10(1/sigma2_N);
+Ps_hat     = mean(X.^2);           % ≈ 1
+Pn_hat     = var(N,1);             % = var(Y-X,1)
+
+SNR_sim_dB = 10*log10(Ps_hat / Pn_hat);
+
+fprintf('\n--- (b) SNR ---\n');
+fprintf('SNR teórico : %.2f dB\n', SNR_teo_dB);
+fprintf('SNR simulado: %.2f dB  (Ps=%.3f, Pn=%.3f)\n', SNR_sim_dB, Ps_hat, Pn_hat);
+
+%% =============================== (c) BER puntual y barrido ================
+Lsim      = 2e5;                 % símbolos para cómputo BER
+sigma2_c  = 0.1;                 % caso puntual pedido
+sigma_c   = sqrt(sigma2_c);
+
+Xc  = 2*(rand(Lsim,1)>0.5)-1;
+Nc  = sigma_c*randn(Lsim,1);
+Yc  = Xc + Nc;
+Xc_hat = ones(Lsim,1); Xc_hat(Yc<0) = -1;
+
+BER_sim = mean(Xc_hat ~= Xc);
+BER_teo = 0.5*erfc( 1/(sqrt(2)*sigma_c) );  % = Q(1/sigma)
+
+fprintf('\n--- (c) BER puntual con sigma_N^2=%.3f ---\n', sigma2_c);
+fprintf('BER teórica = %.3e | BER simulada = %.3e (SNR=%.1f dB)\n', ...
+        BER_teo, BER_sim, 10*log10(1/sigma2_c));
+
+% Barrido de SNR para curva BER
+SNRdB_v   = 0:12;                       % 0..12 dB
+SNRlin_v  = 10.^(SNRdB_v/10);
+BER_teo_v = 0.5*erfc( sqrt(SNRlin_v/2) );   % = Q(sqrt(SNR))
+BER_sim_v = zeros(size(SNRdB_v));
+
+for k = 1:numel(SNRlin_v)
+    s2 = 1/SNRlin_v(k); s = sqrt(s2);
+    Xk = 2*(rand(Lsim,1)>0.5)-1; Nk = s*randn(Lsim,1); Yk = Xk + Nk;
+    Xk_hat = ones(Lsim,1); Xk_hat(Yk<0) = -1;
+    BER_sim_v(k) = mean(Xk_hat ~= Xk);
+end
+
+figure('Name','(c) BER vs SNR','Color','w')
+semilogy(SNRdB_v, BER_teo_v,'-r','LineWidth',1.8); grid on; hold on
+semilogy(SNRdB_v, BER_sim_v,'ob','LineWidth',1.2,'MarkerSize',6)
+xlabel('SNR [dB]','Interpreter','latex','FontSize',fz);
+ylabel('BER','Interpreter','latex','FontSize',fz);
+title('PAM2/BPSK en AWGN — BER teórica vs simulada','Interpreter','latex','FontSize',fz);
+legend('Teoría  $Q(\sqrt{\mathrm{SNR}})$','Simulación','Interpreter','latex','Location','southwest');
+ylim([1e-6, 3e-1])
+
+%% =============================== (d) Efecto de SNR: histogramas ===========
+SNRdB_show = [0, 10];
+figure('Name','(d) Histogramas de Y para dos SNR','Color','w','Position',[50 50 1000 400])
+for i=1:2
+    SNRlin = 10^(SNRdB_show(i)/10);
+    s      = sqrt(1/SNRlin);
+    Xs = 2*(rand(Ns,1)>0.5)-1; Ns_ = s*randn(Ns,1); Ys = Xs + Ns_;
+
+    subplot(1,2,i)
+    histogram(Ys(Xs== 1), 'Normalization','pdf', 'NumBins',120, 'FaceAlpha',0.5); hold on
+    histogram(Ys(Xs==-1), 'Normalization','pdf', 'NumBins',120, 'FaceAlpha',0.5);
+    xx = linspace(-4,4,1200).';
+    plot(xx, 0.5*gauss_pdf(xx,1,s)+0.5*gauss_pdf(xx,-1,s), 'k','LineWidth',1.5)
+    xline(0,':k'); grid on
+    title(sprintf('Histogramas de Y — SNR = %d dB', SNRdB_show(i)));
+    xlabel('y'); ylabel('PDF'); xlim([-3.5 3.5])
+    legend('Y|X=+1','Y|X=-1','Mixtura teórica','Umbral 0','Location','best');
+end
+
+% =========================== Funciones locales =============================
+function y = gauss_pdf(x, mu, sigma)
+% PDF gaussiana N(mu, sigma^2)
+    y = (1./(sqrt(2*pi)*sigma)) .* exp(-0.5*((x-mu)./sigma).^2);
+end

@@ -1,0 +1,173 @@
+% =========================================================================
+% Ejercicio 4 (a)(b)(c) - Ruido blanco banda limitada y PSD (todo en uno)
+% =========================================================================
+clear; close all; clc
+
+%% Parámetros generales
+B        = 500e6;          % Ancho de banda (Hz)
+Ptarget  = 0.1;            % Potencia (W) = 100 mW
+Tsig     = 10e-6;          % Duración (s)
+fz       = 14;
+
+% FIR pasa-bajo (se normaliza con fs en cada inciso)
+ntaps = 1025; 
+beta  = 8.6;               % Kaiser ~60 dB
+
+% Función auxiliar (anónima) -> llama a la función local de abajo
+gen_noise = @(fs,isComplex) local_gen(fs,isComplex,B,Ptarget,Tsig,ntaps,beta);
+
+% Niveles teóricos (constantes para todos los incisos)
+S1      = Ptarget / B;                 % W/Hz  (one-sided, real)
+S1_dBmHz = 10*log10(S1/1e-3);
+S2      = Ptarget / (2*B);             % W/Hz  (two-sided, complex)
+S2_dBmHz = 10*log10(S2/1e-3);
+
+%% ----------------------------- (a) fs = 8 GHz (real) ----------------------
+fs_a = 8e9;
+[y_a, fs_a, f_a, Sy_a, Ptime_a, Parea_a] = gen_noise(fs_a, false);
+
+fprintf('\n(a) fs = %.2f GHz (real)\n', fs_a/1e9);
+fprintf('  Potencia (tiempo)  : %.4f W\n', Ptime_a);
+fprintf('  Potencia (área PSD): %.4f W\n', Parea_a);
+fprintf('  Nivel PSD teórico (one-sided): %.3g W/Hz  (%.2f dBm/Hz)\n', S1, S1_dBmHz);
+
+% --- PSD en W/Hz (escala visible)
+figure; 
+plot(f_a/1e6, Sy_a, 'LineWidth',1.8); grid on; hold on
+yline(S1,'--r','LineWidth',1.6);
+xline(B/1e6, ':k','f_c=B','LabelVerticalAlignment','bottom');
+xlabel('f [MHz]','Interpreter','latex','FontSize',fz);
+ylabel('PSD [W/Hz]','Interpreter','latex','FontSize',fz);
+title('(a) PSD (real, one-sided)','Interpreter','latex','FontSize',fz);
+xlim([0, min(fs_a/2, 1.5*B)]/1e6);
+ylim([0, 3*S1]);
+set(gcf,'Color','w');
+
+% --- PSD en dBm/Hz
+figure;
+plot(f_a/1e6, 10*log10(Sy_a/1e-3), 'LineWidth',1.8); grid on; hold on
+yline(S1_dBmHz,'--r','LineWidth',1.6);
+xline(B/1e6, ':k','f_c=B','LabelVerticalAlignment','bottom');
+xlabel('f [MHz]','Interpreter','latex','FontSize',fz);
+ylabel('PSD [dBm/Hz]','Interpreter','latex','FontSize',fz);
+title('(a) PSD (real, one-sided) [dBm/Hz]','Interpreter','latex','FontSize',fz);
+xlim([0, min(fs_a/2, 1.5*B)]/1e6);
+ylim([S1_dBmHz-20, S1_dBmHz+6]);
+set(gcf,'Color','w');
+
+%% -------------------------- (b) fs = 16 GHz (real) ------------------------
+fs_b = 16e9;
+[y_b, fs_b, f_b, Sy_b, Ptime_b, Parea_b] = gen_noise(fs_b, false);
+
+fprintf('\n(b) fs = %.2f GHz (real)\n', fs_b/1e9);
+fprintf('  Potencia (tiempo)  : %.4f W\n', Ptime_b);
+fprintf('  Potencia (área PSD): %.4f W\n', Parea_b);
+fprintf('  Nivel PSD teórico (one-sided): %.3g W/Hz  (%.2f dBm/Hz)\n', S1, S1_dBmHz);
+
+% --- PSD en W/Hz
+figure; 
+plot(f_b/1e6, Sy_b, 'LineWidth',1.8); grid on; hold on
+yline(S1,'--r','LineWidth',1.6);
+xline(B/1e6, ':k','f_c=B','LabelVerticalAlignment','bottom');
+xlabel('f [MHz]','Interpreter','latex','FontSize',fz);
+ylabel('PSD [W/Hz]','Interpreter','latex','FontSize',fz);
+title('(b) PSD (real, one-sided) con fs=16 GHz','Interpreter','latex','FontSize',fz);
+xlim([0, min(fs_b/2, 1.5*B)]/1e6);
+ylim([0, 3*S1]);
+set(gcf,'Color','w');
+
+% --- PSD en dBm/Hz
+figure;
+plot(f_b/1e6, 10*log10(Sy_b/1e-3), 'LineWidth',1.8); grid on; hold on
+yline(S1_dBmHz,'--r','LineWidth',1.6);
+xline(B/1e6, ':k','f_c=B','LabelVerticalAlignment','bottom');
+xlabel('f [MHz]','Interpreter','latex','FontSize',fz);
+ylabel('PSD [dBm/Hz]','Interpreter','latex','FontSize',fz);
+title('(b) PSD (real, one-sided) [dBm/Hz] con fs=16 GHz','Interpreter','latex','FontSize',fz);
+xlim([0, min(fs_b/2, 1.5*B)]/1e6);
+ylim([S1_dBmHz-20, S1_dBmHz+6]);
+set(gcf,'Color','w');
+
+%% ---------------- (c) Ruido COMPLEJO de potencia 100 mW -------------------
+fs_c = fs_a;  % podés usar 8 o 16 GHz; el nivel por Hz no cambia
+[y_c, fs_c, f_c, Sy_c_twos, Ptime_c, Parea_c] = gen_noise(fs_c, true);
+
+fprintf('\n(c) Ruido complejo, fs = %.2f GHz\n', fs_c/1e9);
+fprintf('  Potencia (tiempo)  : %.4f W\n', Ptime_c);
+fprintf('  Potencia (área PSD): %.4f W\n', Parea_c);
+fprintf('  Nivel PSD teórico (two-sided): %.3g W/Hz  (%.2f dBm/Hz)\n', S2, S2_dBmHz);
+
+% --- PSD two-sided centrada en 0 (dBm/Hz)
+figure; 
+f_c_shift   = (f_c - fs_c/2)/1e6;            % MHz centrado
+Sy_c_dbmHz  = 10*log10(fftshift(Sy_c_twos)/1e-3);
+plot(f_c_shift, Sy_c_dbmHz, 'LineWidth',1.8); grid on; hold on
+yline(S2_dBmHz,'--r','LineWidth',1.6);
+xline(-B/1e6, ':k'); xline(B/1e6, ':k');
+xlabel('f [MHz] (centrado)','Interpreter','latex','FontSize',fz);
+ylabel('PSD [dBm/Hz]','Interpreter','latex','FontSize',fz);
+title('(c) PSD (complejo, two-sided) [dBm/Hz]','Interpreter','latex','FontSize',fz);
+xlim([-1.5*B, 1.5*B]/1e6);
+ylim([S2_dBmHz-20, S2_dBmHz+6]);
+set(gcf,'Color','w');
+
+%% --------- Comparación visual real vs complejo (mismo fs, mismo P) -------
+figure;
+subplot(2,1,1)
+plot(f_a/1e6, Sy_a, 'LineWidth',1.5); grid on; hold on
+yline(S1,'--r'); xline(B/1e6,':k');
+title('Real (one-sided) - W/Hz','Interpreter','latex','FontSize',fz);
+ylabel('W/Hz','Interpreter','latex','FontSize',fz);
+xlim([0, min(fs_a/2, 1.5*B)]/1e6); ylim([0, 3*S1]);
+
+subplot(2,1,2)
+plot(f_c_shift, Sy_c_dbmHz, 'LineWidth',1.5); grid on; hold on
+yline(S2_dBmHz,'--r'); xline(-B/1e6,':k'); xline(B/1e6,':k');
+title('Complejo (two-sided) - dBm/Hz','Interpreter','latex','FontSize',fz);
+xlabel('f [MHz]','Interpreter','latex','FontSize',fz);
+ylabel('dBm/Hz','Interpreter','latex','FontSize',fz);
+xlim([-1.5*B, 1.5*B]/1e6); ylim([S2_dBmHz-20, S2_dBmHz+6]);
+set(gcf,'Color','w');
+
+% ========================== Función local ================================
+function [y_ss, fs, f, Sy, Ptime, Parea] = local_gen(fs, isComplex, B, Ptarget, Tsig, ntaps, beta)
+    % Genera WGN (real o complejo), lo limita a B con un FIR, y lo escala a Ptarget.
+    n    = round(Tsig*fs);
+    Wn   = B/(fs/2);                              % corte normalizado
+    winF = kaiser(ntaps, beta).';
+    hLP  = fir1(ntaps-1, Wn, 'low', winF);
+
+    % WGN
+    if isComplex
+        x = (randn(n,1) + 1j*randn(n,1))/sqrt(2); % CSCG, var total = 1
+    else
+        x = randn(n,1);                           % real, var = 1
+    end
+
+    % Filtrado banda
+    y = filter(hLP, 1, x);
+
+    % Quitar transitorio
+    y_ss = y(ntaps+1:end);
+
+    % Escalar a potencia objetivo
+    Ppre  = mean(abs(y_ss).^2);
+    alpha = sqrt(Ptarget / Ppre);
+    y_ss  = alpha * y_ss;
+
+    % Welch
+    NFFT     = 65536;
+    wWelch   = hann(4096);
+    noverlap = 2048;
+
+    if isComplex
+        [Sy, f] = pwelch(y_ss - mean(y_ss), wWelch, noverlap, NFFT, fs, 'twosided');
+    else
+        [Sy, f] = pwelch(y_ss - mean(y_ss), wWelch, noverlap, NFFT, fs, 'onesided');
+    end
+
+    % Potencias
+    df    = f(2)-f(1);
+    Parea = sum(Sy) * df;              % área bajo la PSD
+    Ptime = mean(abs(y_ss).^2);        % verificación temporal
+end
